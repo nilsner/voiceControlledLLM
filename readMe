@@ -1,3 +1,5 @@
+## How to run
+`python backup_main.py 2>/dev/null`
 ## Detailed Module Descriptions
 
 ### Main Class
@@ -44,8 +46,6 @@
 - **Description**: Controls the water dispensing system for both hot and cold water.
 - **Technical Details**:
     - **State Management**: Tracks dispensing status and timing
-    - **Safety Features**: Implements automatic 7-second dispensing timeout
-    - **Water Types**: Supports both hot and cold water dispensing
     - **Thread Safety**: Uses threading for timer-based operations
     - **Error Handling**: Prevents concurrent dispensing operations
 
@@ -54,17 +54,20 @@
 ```mermaid
 sequenceDiagram
     participant User
-    participant UltrasonicSensor
     participant Main
+    participant UltrasonicSensor
+    
     participant SpeechToText
     participant LLMModule
     participant TextToSpeech
     participant WaterController
 
     loop Continuous Detection
-        UltrasonicSensor->>Main: Check distance
+        Main->>UltrasonicSensor: Check distance
+        UltrasonicSensor->>Main: Return distance
         alt User detected (distance < threshold)
-            UltrasonicSensor->>Main: User presence detected
+            Main->>TextToSpeech: Start the process
+            TextToSpeech->>User: Ask user for their request
             Main->>SpeechToText: Activate listening
             User->>SpeechToText: Speak command
             SpeechToText->>Main: Convert speech to text
@@ -73,12 +76,11 @@ sequenceDiagram
             Main->>TextToSpeech: Convert response to speech
             TextToSpeech->>User: Play audio response
             alt Water request approved
-                Main->>WaterController: Dispense water
+                Main->>WaterController: Instructions on water to be dispensed
                 WaterController->>User: Dispense requested water
             end
         else No user detected
-            UltrasonicSensor->>Main: User out of range
-            Main->>Main: Enter idle state
-            Main->>SpeechToText: Deactivate listening
+            Main->>Main: Idle for 5 seconds
         end
     end
+```

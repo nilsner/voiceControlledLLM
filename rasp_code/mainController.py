@@ -2,76 +2,82 @@ import time
 from water_controller import WaterController
 from speech_to_text import SpeechToText
 from llmModule import LLMModule
+from ultrasonic_sensor import UltrasonicSensor
+from text_to_speech import TextToSpeech
+servo_pin = 5
+ultrasonic_pin = 16
 
-class MainController:
-    def __init__(self, ultrasonic_sensor):
-        self.water_controller = WaterController()
+class BackupController:
+    def __init__(self):
+        self.water_controller = WaterController(servo_pin)
+        self.water_controller._reset_servo()
         self.speech_to_text = SpeechToText()
         self.llm = LLMModule()
-        self.ultrasonic_sensor = ultrasonic_sensor  # Simulates user detection logic
-        self.listening = False
+        self.tts = TextToSpeech()
+        print('initialized')
+    
+    def exit(self):
+        print('Resetting servo')
+        self.water_controller._reset_servo()
 
     def run(self):
-        while True:
-            # Continuously check for user presence
-            if self.user_detected():
-                print("User detected. Activating listening...")
-                self.activate_listening()
-            else:
-                print("No user detected. Deactivating listening...")
-                self.deactivate_listening()
-            time.sleep(0.1)
+        self.tts.speak("Hello, what do you want?")
+        time.sleep(2)
+        command = self.speech_to_text.recognize_speech()
 
-    def user_detected(self):
-        """Check if a user is within range of the ultrasonic sensor."""
-        distance = self.ultrasonic_sensor.get_distance()
-        return distance < self.ultrasonic_sensor.threshold  # Example threshold value
-
-    def activate_listening(self):
-        """Handle the listening and processing of user commands."""
-        if not self.listening:
-            self.listening = True
-            print("Listening for user command...")
-            command = self.speech_to_text.recognize_speech()
-            self.process_command(command)
-            self.listening = False
-
-    def deactivate_listening(self):
-        """Reset state when no user is detected."""
-        if self.listening:
-            self.listening = False
+        self.process_command(command)
+        """  if not should_continue:
+            self.working = False
+        time.sleep(10) """
 
     def process_command(self, command):
-        """Process the command recognized from speech."""
-        print(f"Processing command: {command}")
+        #Process user commands and return False if program should stop.
+        """        if self.water_controller.is_dispensing:
+            if "stop" in command or "cancel" in command:
+                self.water_controller.stop_dispensing()
+                return False
+            print("Currently dispensing. Say 'stop' or 'cancel' to stop.")
+        """
+        # Handle commands when not dispensing
         response = self.llm.call_gemini(command)
         
-        if response["allowedWater"]:
-            type_of_water = response["typeOfWater"]
-            print(f"Dispensing {type_of_water} water.")
-            if type_of_water == "hot":
-                self.water_controller.dispense_hot_water()
-            elif type_of_water == "cold":
-                self.water_controller.dispense_cold_water()
+        if response["niceUserRequest"]:
+            type = response["typeOfWater"]
+            #print(f"{type}")
+            if "hot" in type:
+                self.tts.speak(response["answer"])
+                self.water_controller.dispense_hot_water(response["waterAmount"])
+                #time.sleep(2)
+                #self.tts.speak(response["finalResponse"])
+            elif "cold" in type:
+                self.tts.speak(response["answer"])
+                self.water_controller.dispense_cold_water(response["waterAmount"])
+                #time.sleep(2)
+                #self.tts.speak(response["finalResponse"])
+            elif "none" in type:
+                self.tts.speak(response["answer"])
+            else:
+                self.tts.speak("Unknown command. Please specify if its either 'hot water' or 'cold water'.")
         else:
             reason = response["answer"]
-            print(f"Cannot dispense water. Reason: {reason}")
-
-# Example UltrasonicSensor class for testing
-class UltrasonicSensor:
-    def __init__(self, threshold=50):
-        self.threshold = threshold  # Example threshold in cm
-
-    def get_distance(self):
-        """Simulate getting the distance from the sensor."""
-        # Replace with actual sensor reading logic
-        return 30  # Simulating a user in range
-
+            self.tts.speak(reason)
+        return True
+ 
 if __name__ == "__main__":
-    sensor = UltrasonicSensor()
-    controller = MainController(sensor)
-
-    try:
-        controller.run()
-    except KeyboardInterrupt:
-        print("Program stopped by user.")
+    controller = BackupController()
+    ultrasonic_sensor = UltrasonicSensor(port=ultrasonic_pin) 
+    looping = True
+    while looping:
+        try:
+            distance = ultrasonic_sensor.measure_distance()
+            print(f"Measured Distance: {distance} cm")
+            if distance < 50:
+                controller.run()
+            else:
+                print("Distance is greater than or equal to 50 cm. Idling...")
+            time.sleep(5)
+        except KeyboardInterrupt:
+            print("Program interrupted. Exiting.")
+            looping = False
+            controller.exit()
+            break
