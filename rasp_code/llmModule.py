@@ -8,7 +8,7 @@ import json
 # Get your own API key from https://aistudio.google.com/app/apikey
 #GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
-GEMINI_API_KEY = GEMINI_API_KEY = 'AIzaSyA5orZmLVXPLOI1iHdNoo31H8fE80KxwV0'
+GEMINI_API_KEY = GEMINI_API_KEY = 'xxxx'
 genai.configure(api_key=GEMINI_API_KEY)
 
 class LLMModule:
